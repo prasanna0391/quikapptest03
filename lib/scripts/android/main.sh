@@ -350,12 +350,6 @@ configure_email_settings() {
 setup_build_environment() {
     echo "Setting up build environment..."
     
-    # Set Flutter version
-    if [ -n "${FLUTTER_VERSION:-}" ]; then
-        echo "Using Flutter version: ${FLUTTER_VERSION}"
-        flutter version ${FLUTTER_VERSION}
-    fi
-    
     # Set Gradle version
     if [ -n "${GRADLE_VERSION:-}" ]; then
         echo "Using Gradle version: ${GRADLE_VERSION}"
