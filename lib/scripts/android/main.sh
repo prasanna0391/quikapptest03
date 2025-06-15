@@ -229,35 +229,43 @@ initialize_flutter_android() {
 configure_build_mode() {
     echo "Configuring build mode..."
     
-    case "${BUILD_MODE:-}" in
-        "basic_apk")
-            echo "Configuring Basic APK build..."
-            export PUSH_NOTIFY="false"
-            export KEY_STORE=""
-            export OUTPUT_TYPES="apk"
-            ;;
-        "firebase_apk")
-            echo "Configuring Firebase APK build..."
-            export PUSH_NOTIFY="true"
-            export KEY_STORE=""
-            export OUTPUT_TYPES="apk"
-            ;;
-        "full_release")
-            echo "Configuring Full Release build..."
-            export PUSH_NOTIFY="true"
-            export OUTPUT_TYPES="apk,aab"
-            ;;
-        "aab_only")
-            echo "Configuring AAB Only build..."
-            export PUSH_NOTIFY="false"
-            export OUTPUT_TYPES="aab"
+    # Set default build mode if not specified
+    BUILD_MODE="${BUILD_MODE:-basic}"
+    
+    # Validate build mode
+    case "${BUILD_MODE}" in
+        "basic"|"firebase"|"release"|"aab"|"app-store")
+            echo "✅ Build mode set to: ${BUILD_MODE}"
             ;;
         *)
-            handle_build_error "Invalid build mode: ${BUILD_MODE:-}" 1 "$0" "${LINENO:-}"
+            handle_build_error "Invalid build mode: ${BUILD_MODE}" 1 "$0" "${LINENO:-}"
             ;;
     esac
     
-    echo "✅ Build mode configured: ${BUILD_MODE:-}"
+    # Configure build parameters based on mode
+    case "${BUILD_MODE}" in
+        "basic")
+            BUILD_TYPE="apk"
+            BUILD_FLAVOR="basic"
+            ;;
+        "firebase")
+            BUILD_TYPE="apk"
+            BUILD_FLAVOR="firebase"
+            ;;
+        "release"|"app-store")
+            BUILD_TYPE="apk"
+            BUILD_FLAVOR="release"
+            ;;
+        "aab")
+            BUILD_TYPE="appbundle"
+            BUILD_FLAVOR="release"
+            ;;
+    esac
+    
+    echo "📦 Build configuration:"
+    echo "- Type: ${BUILD_TYPE}"
+    echo "- Flavor: ${BUILD_FLAVOR}"
+    echo "- Mode: ${BUILD_MODE}"
 }
 
 # Setup output directories
