@@ -23,6 +23,131 @@ mkdir -p android/app/src/main/res/values
 mkdir -p android/app/src/main/kotlin/com/garbcode/garbcodeapp
 echo "✅ Required directories created"
 
+# Setup Android Gradle project
+setup_android_gradle() {
+    echo "Setting up Android Gradle project..."
+    
+    # Create build.gradle.kts for app module
+    cat > android/app/build.gradle.kts << 'EOL'
+plugins {
+    id("com.android.application")
+    id("kotlin-android")
+    id("com.google.gms.google-services")
+}
+
+android {
+    namespace = "com.garbcode.garbcodeapp"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.garbcode.garbcodeapp"
+        minSdk = 21
+        targetSdk = 35
+        versionCode = 27
+        versionName = "1.0.22"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+}
+
+dependencies {
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.0")
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("com.google.firebase:firebase-messaging:23.4.0")
+    implementation("com.google.firebase:firebase-analytics:21.5.0")
+}
+EOL
+
+    # Create build.gradle.kts for project
+    cat > android/build.gradle.kts << 'EOL'
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.2.0")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0")
+        classpath("com.google.gms:google-services:4.4.0")
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+tasks.register("clean", Delete::class) {
+    delete(rootProject.buildDir)
+}
+EOL
+
+    # Create settings.gradle.kts
+    cat > android/settings.gradle.kts << 'EOL'
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "android"
+include(":app")
+EOL
+
+    # Create gradle.properties
+    cat > android/gradle.properties << 'EOL'
+org.gradle.jvmargs=-Xmx1536M
+android.useAndroidX=true
+android.enableJetifier=true
+android.nonTransitiveRClass=true
+EOL
+
+    # Create gradle-wrapper.properties
+    mkdir -p android/gradle/wrapper
+    cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOL'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-all.zip
+EOL
+
+    echo "✅ Android Gradle project setup completed"
+}
+
 # Make all .sh files executable
 make_scripts_executable() {
     print_section "Making scripts executable"
@@ -1017,6 +1142,7 @@ main() {
     
     # Phase 1: Project Setup & Core Configuration
     setup_build_environment || handle_build_error "Failed to setup build environment"
+    setup_android_gradle
     download_splash_assets || handle_build_error "Failed to download splash assets"
     generate_launcher_icons || handle_build_error "Failed to generate launcher icons"
     
