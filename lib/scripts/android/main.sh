@@ -107,11 +107,11 @@ validate_required_variables() {
     
     # Function to check variables
     check_variables() {
-        local -n vars=$1
-        local category=$2
+        local category=$1
+        shift
         local missing=()
         
-        for var in "${vars[@]}"; do
+        for var in "$@"; do
             if [ -z "${!var:-}" ]; then
                 missing+=("$var")
             fi
@@ -129,34 +129,34 @@ validate_required_variables() {
     local has_errors=0
     
     echo "Checking App Configuration Variables..."
-    check_variables required_vars "App Configuration" || has_errors=1
+    check_variables "App Configuration" "${required_vars[@]}" || has_errors=1
     
     echo "Checking Feature Flags..."
-    check_variables feature_flags "Feature Flags" || has_errors=1
+    check_variables "Feature Flags" "${feature_flags[@]}" || has_errors=1
     
     echo "Checking Permission Flags..."
-    check_variables permission_flags "Permission Flags" || has_errors=1
+    check_variables "Permission Flags" "${permission_flags[@]}" || has_errors=1
     
     echo "Checking Branding Variables..."
-    check_variables branding_vars "Branding" || has_errors=1
+    check_variables "Branding" "${branding_vars[@]}" || has_errors=1
     
     echo "Checking UI Configuration Variables..."
-    check_variables ui_config_vars "UI Configuration" || has_errors=1
+    check_variables "UI Configuration" "${ui_config_vars[@]}" || has_errors=1
     
     # Check Firebase variables if push notifications are enabled
     if [ "${PUSH_NOTIFY:-}" = "true" ]; then
         echo "Checking Firebase Configuration..."
-        check_variables firebase_vars "Firebase" || has_errors=1
+        check_variables "Firebase" "${firebase_vars[@]}" || has_errors=1
     fi
     
     # Check Keystore variables if needed
     if [ "${PUSH_NOTIFY:-}" = "true" ] || [ "${KEY_STORE:-}" != "" ]; then
         echo "Checking Keystore Variables..."
-        check_variables keystore_vars "Keystore" || has_errors=1
+        check_variables "Keystore" "${keystore_vars[@]}" || has_errors=1
     fi
     
     echo "Checking Admin Variables..."
-    check_variables admin_vars "Admin" || has_errors=1
+    check_variables "Admin" "${admin_vars[@]}" || has_errors=1
     
     if [ $has_errors -eq 1 ]; then
         handle_build_error "Missing required variables" 1 "$0" "${LINENO:-}"
