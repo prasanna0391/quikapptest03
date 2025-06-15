@@ -21,6 +21,21 @@ echo "Build Configuration:"
 echo "- Push Notifications: ${PUSH_NOTIFY}"
 echo "- Keystore URL: ${HAS_KEYSTORE_URL:+Present}"
 
+# Get Flutter SDK path from local.properties
+FLUTTER_SDK_PATH=""
+if [ -f "android/local.properties" ]; then
+    FLUTTER_SDK_PATH=$(grep "flutter.sdk" android/local.properties | cut -d'=' -f2)
+    # Remove any quotes if present
+    FLUTTER_SDK_PATH=$(echo "$FLUTTER_SDK_PATH" | tr -d '"')
+fi
+
+if [ -z "$FLUTTER_SDK_PATH" ]; then
+    echo "❌ Error: Flutter SDK path not found in local.properties"
+    exit 1
+fi
+
+echo "Using Flutter SDK path: $FLUTTER_SDK_PATH"
+
 # Added debugging to verify file locations
 echo "-------------------------------------------------"
 echo "🔍 Listing contents of the /android/ directory to verify file locations..."
@@ -31,9 +46,9 @@ echo "-------------------------------------------------"
 echo "✍️ Writing root Gradle files..."
 
 # Create settings.gradle.kts
-cat > android/settings.gradle.kts << 'EOF'
+cat > android/settings.gradle.kts << EOF
 pluginManagement {
-    includeBuild("${FLUTTER_ROOT}/packages/flutter_tools/gradle")
+    includeBuild("$FLUTTER_SDK_PATH/packages/flutter_tools/gradle")
     repositories {
         google()
         mavenCentral()
