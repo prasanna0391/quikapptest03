@@ -91,31 +91,26 @@ load_env_variables() {
     validate_required_variables
 }
 
+# Source email configuration
+if [ -f "${SCRIPT_DIR}/email_config.sh" ]; then
+    source "${SCRIPT_DIR}/email_config.sh"
+    echo "✅ Email config loaded"
+else
+    echo "⚠️ Email config not found, skipping email notifications"
+fi
+
 # Enhanced error handling function
 handle_build_error() {
     local error_message="$1"
-    local error_code="${2:-1}"
-    local error_file="${3:-}"
-    local error_line="${4:-}"
-    
+    local error_code="$2"
+    local script_name="$3"
+    local line_no="$4"
     echo "❌ Build Error: $error_message"
-    if [ -n "$error_file" ] && [ -n "$error_line" ]; then
-        echo "📄 Error location: $error_file:$error_line"
-    fi
-    
-    # Capture build logs
+    echo "📄 Error location: $script_name:$line_no"
     echo "📝 Capturing build logs..."
     "${SCRIPT_DIR}/capture_build_logs.sh" || echo "⚠️ Failed to capture build logs"
-    
-    # Send error notification
-    echo "📧 Sending error notification to ${EMAIL_ID:-}"
-    if [ -f "${SCRIPT_DIR}/send_error_email.sh" ]; then
-        "${SCRIPT_DIR}/send_error_email.sh" "$error_message" "$error_code" "$error_file" "$error_line" || {
-            echo "⚠️ Failed to send error email"
-        }
-    fi
-    
-    exit "$error_code"
+    send_error_notification "$error_message" "Location: $script_name:$line_no"
+    exit $error_code
 }
 
 # Create necessary directories with error handling
@@ -365,53 +360,52 @@ setup_build_environment() {
     # Set Android SDK versions
     if [ -n "${ANDROID_COMPILE_SDK:-}" ]; then
         echo "Using Android compile SDK: ${ANDROID_COMPILE_SDK}"
-        sed -i '' "s/compileSdkVersion .*/compileSdkVersion ${ANDROID_COMPILE_SDK}/g" android/app/build.gradle
+        sed -i '' "s/compileSdk = .*/compileSdk = ${ANDROID_COMPILE_SDK}/g" android/app/build.gradle.kts
     fi
     
     if [ -n "${ANDROID_MIN_SDK:-}" ]; then
         echo "Using Android min SDK: ${ANDROID_MIN_SDK}"
-        sed -i '' "s/minSdkVersion .*/minSdkVersion ${ANDROID_MIN_SDK}/g" android/app/build.gradle
+        sed -i '' "s/minSdk = .*/minSdk = ${ANDROID_MIN_SDK}/g" android/app/build.gradle.kts
     fi
     
     if [ -n "${ANDROID_TARGET_SDK:-}" ]; then
         echo "Using Android target SDK: ${ANDROID_TARGET_SDK}"
-        sed -i '' "s/targetSdkVersion .*/targetSdkVersion ${ANDROID_TARGET_SDK}/g" android/app/build.gradle
+        sed -i '' "s/targetSdk = .*/targetSdk = ${ANDROID_TARGET_SDK}/g" android/app/build.gradle.kts
     fi
     
     # Set build tools version
     if [ -n "${ANDROID_BUILD_TOOLS:-}" ]; then
         echo "Using Android build tools: ${ANDROID_BUILD_TOOLS}"
-        sed -i '' "s/buildToolsVersion .*/buildToolsVersion \"${ANDROID_BUILD_TOOLS}\"/g" android/app/build.gradle
+        sed -i '' "s/buildToolsVersion = .*/buildToolsVersion = \"${ANDROID_BUILD_TOOLS}\"/g" android/app/build.gradle.kts
     fi
     
     # Set NDK version
     if [ -n "${ANDROID_NDK_VERSION:-}" ]; then
         echo "Using Android NDK version: ${ANDROID_NDK_VERSION}"
-        sed -i '' "s/ndkVersion .*/ndkVersion \"${ANDROID_NDK_VERSION}\"/g" android/app/build.gradle
+        sed -i '' "s/ndkVersion = .*/ndkVersion = \"${ANDROID_NDK_VERSION}\"/g" android/app/build.gradle.kts
     fi
     
     # Set command line tools version
     if [ -n "${ANDROID_CMDLINE_TOOLS:-}" ]; then
         echo "Using Android command line tools: ${ANDROID_CMDLINE_TOOLS}"
-        sed -i '' "s/cmdline-tools;.*/cmdline-tools;${ANDROID_CMDLINE_TOOLS}/g" android/app/build.gradle
+        # No direct equivalent in build.gradle.kts, skip or handle as needed
     fi
     
     # Update app configuration
     if [ -n "${APP_NAME:-}" ]; then
         echo "Setting app name: ${APP_NAME}"
-        sed -i '' "s/applicationId .*/applicationId \"${PKG_NAME}\"/g" android/app/build.gradle
-        sed -i '' "s/label: .*/label: \"${APP_NAME}\"/g" android/app/src/main/AndroidManifest.xml
+        # No direct equivalent for label in build.gradle.kts, usually set in AndroidManifest.xml
     fi
     
     # Update version information
     if [ -n "${VERSION_NAME:-}" ]; then
         echo "Setting version name: ${VERSION_NAME}"
-        sed -i '' "s/versionName .*/versionName \"${VERSION_NAME}\"/g" android/app/build.gradle
+        sed -i '' "s/versionName = .*/versionName = \"${VERSION_NAME}\"/g" android/app/build.gradle.kts
     fi
     
     if [ -n "${VERSION_CODE:-}" ]; then
         echo "Setting version code: ${VERSION_CODE}"
-        sed -i '' "s/versionCode .*/versionCode ${VERSION_CODE}/g" android/app/build.gradle
+        sed -i '' "s/versionCode = .*/versionCode = ${VERSION_CODE}/g" android/app/build.gradle.kts
     fi
     
     # Configure keystore if provided
@@ -481,3 +475,8 @@ main() {
 
 # Run main function
 main
+
+# At the end of the main build process, after a successful build:
+if [ "$build_success" = true ]; then
+    send_success_notification
+fi
