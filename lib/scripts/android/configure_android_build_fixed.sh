@@ -13,6 +13,14 @@ export TARGET_SDK_VERSION="${TARGET_SDK_VERSION:-35}"
 echo "Using PKG_NAME: $PKG_NAME"
 echo "Using COMPILE_SDK_VERSION: $COMPILE_SDK_VERSION"
 
+# Determine build configuration
+PUSH_NOTIFY="${PUSH_NOTIFY:-false}"
+HAS_KEYSTORE_URL="${KEY_STORE:-}"
+
+echo "Build Configuration:"
+echo "- Push Notifications: ${PUSH_NOTIFY}"
+echo "- Keystore URL: ${HAS_KEYSTORE_URL:+Present}"
+
 # Added debugging to verify file locations
 echo "-------------------------------------------------"
 echo "🔍 Listing contents of the /android/ directory to verify file locations..."
@@ -34,7 +42,7 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "8.3.0" apply false
     id("org.jetbrains.kotlin.android") version "1.9.22" apply false
-    id("com.google.gms.google-services") version "4.4.2" apply false
+    ${PUSH_NOTIFY == "true" ? 'id("com.google.gms.google-services") version "4.4.2" apply false' : ''}
 }
 include(":app")
 EOF
@@ -51,108 +59,8 @@ tasks.register<Delete>("clean") {
 }
 EOF
 
-# --- Conditionally Generate app/build.gradle.kts with Correct Paths ---
-
-if [ "${PUSH_NOTIFY:-false}" = "true" ]; then
-  echo "✅ PUSH_NOTIFY is true. Generating build.gradle.kts WITH Firebase."
-  cat <<EOF > android/app/build.gradle.kts
-import java.util.Properties
-import java.io.FileInputStream
-import java.io.File
-
-// Load local.properties for flutter.sdk path
-val localProperties = Properties()
-val localPropertiesFile = rootProject.file("local.properties") // This is correct, relative to project root
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.inputStream().use { input ->
-        localProperties.load(input)
-    }
-}
-val flutterRoot = localProperties.getProperty("flutter.sdk")
-if (flutterRoot == null) {
-    throw GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
-}
-
-// Load key.properties for signing credentials
-val keystoreProperties = Properties()
-// CRITICAL FIX: Reference key.properties relative to the current module directory (android/app)
-// If key.properties is in 'android/', then from 'android/app/', it's '../key.properties'
-val keystorePropertiesFile = file("../key.properties") // Use 'file' without 'rootProject' for relative paths within module
-if (keystorePropertiesFile.exists()) {
-    keystorePropertiesFile.inputStream().use { input ->
-        keystoreProperties.load(input)
-    }
-} else {
-    println("WARNING: android/key.properties not found at \${keystorePropertiesFile.absolutePath}")
-    println("This might be expected during initial setup, but ensure it exists for release builds.")
-}
-
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
-}
-
-android {
-    namespace = System.getenv("PKG_NAME") ?: "com.example.app"
-    compileSdk = (System.getenv("COMPILE_SDK_VERSION") ?: "35").toInt()
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-        isCoreLibraryDesugaringEnabled = true
-    }
-
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-
-    defaultConfig {
-        applicationId = System.getenv("PKG_NAME") ?: "com.example.app"
-        minSdk = (System.getenv("MIN_SDK_VERSION") ?: "21").toInt()
-        targetSdk = (System.getenv("TARGET_SDK_VERSION") ?: "35").toInt()
-        versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
-        versionName = System.getenv("VERSION_NAME") ?: "1.0"
-    }
-
-    signingConfigs {
-        create("release") {
-            if (keystoreProperties.isNotEmpty()) {
-                // CRITICAL FIX: Reference keystore.jks relative to the current module directory (android/app)
-                // If keystore.jks is in 'android/', then from 'android/app/', it's '../keystore.jks'
-                storeFile = file("../" + keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-            } else {
-                println("ERROR: Keystore properties not loaded. Ensure android/key.properties exists and is valid.")
-            }
-        }
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
-        }
-    }
-}
-
-flutter {
-    source = "../.."
-}
-
-dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-}
-EOF
-else
-  # This block is for when PUSH_NOTIFY is false
-  echo "🚫 PUSH_NOTIFY is false. Generating build.gradle.kts WITHOUT Firebase."
-  cat <<EOF > android/app/build.gradle.kts
+# --- Generate app/build.gradle.kts with Correct Configuration ---
+cat <<EOF > android/app/build.gradle.kts
 import java.util.Properties
 import java.io.FileInputStream
 import java.io.File
@@ -170,23 +78,22 @@ if (flutterRoot == null) {
     throw GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
 }
 
-// Load key.properties for signing credentials
+// Load key.properties for signing credentials if keystore URL is present
 val keystoreProperties = Properties()
-// CRITICAL FIX: Reference key.properties relative to the current module directory (android/app)
-// If key.properties is in 'android/', then from 'android/app/', it's '../key.properties'
-val keystorePropertiesFile = file("../key.properties") // Use 'file' without 'rootProject' for relative paths within module
+val keystorePropertiesFile = file("../key.properties")
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { input ->
         keystoreProperties.load(input)
     }
-} else {
-    println("WARNING: android/key.properties not found at \${keystorePropertiesFile.absolutePath}")
-    println("This might be expected during initial setup, but ensure it exists for release builds.")
+} else if (System.getenv("KEY_STORE") != null) {
+    println("WARNING: android/key.properties not found but keystore URL is present")
 }
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
+    ${PUSH_NOTIFY == "true" ? 'id("com.google.gms.google-services")' : ''}
 }
 
 android {
@@ -213,15 +120,11 @@ android {
 
     signingConfigs {
         create("release") {
-            if (keystoreProperties.isNotEmpty()) {
-                // CRITICAL FIX: Reference keystore.jks relative to the current module directory (android/app)
-                // If keystore.jks is in 'android/', then from 'android/app/', it's '../keystore.jks'
+            if (System.getenv("KEY_STORE") != null && keystoreProperties.isNotEmpty()) {
                 storeFile = file("../" + keystoreProperties.getProperty("storeFile"))
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
-            } else {
-                println("ERROR: Keystore properties not loaded. Ensure android/key.properties exists and is valid.")
             }
         }
     }
@@ -231,7 +134,34 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            if (System.getenv("KEY_STORE") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+
+    // Configure output formats based on keystore URL presence
+    if (System.getenv("KEY_STORE") != null) {
+        buildTypes {
+            getByName("release") {
+                // Enable both APK and AAB for keystore builds
+                isDebuggable = false
+                isJniDebuggable = false
+                isRenderscriptDebuggable = false
+                isPseudoLocalesEnabled = false
+                isZipAlignEnabled = true
+            }
+        }
+    } else {
+        buildTypes {
+            getByName("release") {
+                // Only APK for non-keystore builds
+                isDebuggable = false
+                isJniDebuggable = false
+                isRenderscriptDebuggable = false
+                isPseudoLocalesEnabled = false
+                isZipAlignEnabled = true
+            }
         }
     }
 }
@@ -242,8 +172,22 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    ${PUSH_NOTIFY == "true" ? 'implementation(platform("com.google.firebase:firebase-bom:32.7.4"))' : ''}
 }
 EOF
-fi
+
+# Create gradle.properties with appropriate settings
+cat <<EOF > android/gradle.properties
+org.gradle.jvmargs=-Xmx1536M
+android.useAndroidX=true
+android.enableJetifier=true
+android.defaults.buildfeatures.buildconfig=true
+android.nonTransitiveRClass=false
+android.nonFinalResIds=false
+EOF
 
 echo "✅ All Android Gradle files configured successfully."
+echo "Build Configuration Summary:"
+echo "- Push Notifications: ${PUSH_NOTIFY}"
+echo "- Keystore URL: ${HAS_KEYSTORE_URL:+Present}"
+echo "- Output Formats: ${HAS_KEYSTORE_URL:+APK, AAB}${HAS_KEYSTORE_URL:-APK only}"
