@@ -55,6 +55,56 @@ make_scripts_executable() {
     echo "✅ Scripts made executable"
 }
 
+# Initialize Flutter Android project
+initialize_flutter_android() {
+    echo "Initializing Flutter Android project..."
+    
+    # Create a temporary directory
+    TEMP_DIR=$(mktemp -d)
+    echo "Created temporary directory: $TEMP_DIR"
+    
+    # Create a new Flutter project in the temp directory
+    cd "$TEMP_DIR"
+    flutter create --org com.garbcode --project-name garbcodeapp .
+    
+    # Ensure the android directory exists in the project
+    if [ ! -d "$PROJECT_ROOT/android" ]; then
+        mkdir -p "$PROJECT_ROOT/android"
+    fi
+    
+    # Copy the Android configuration files
+    echo "Copying Android configuration files..."
+    if [ -d "$TEMP_DIR/android" ]; then
+        cp -r "$TEMP_DIR/android/"* "$PROJECT_ROOT/android/" || {
+            echo "❌ Failed to copy Android files"
+            cd "$PROJECT_ROOT"
+            rm -rf "$TEMP_DIR"
+            handle_build_error "Failed to copy Android files"
+        }
+    else
+        cd "$PROJECT_ROOT"
+        rm -rf "$TEMP_DIR"
+        handle_build_error "Android directory not found in temporary Flutter project"
+    fi
+    
+    # Clean up
+    cd "$PROJECT_ROOT"
+    rm -rf "$TEMP_DIR"
+    
+    # Verify build.gradle exists
+    if [ ! -f "$PROJECT_ROOT/android/app/build.gradle" ]; then
+        handle_build_error "build.gradle not found after project initialization"
+    fi
+    
+    # Update the application ID and version in build.gradle
+    echo "Updating build.gradle configuration..."
+    sed -i '' "s/applicationId \"com.garbcode.garbcodeapp\"/applicationId \"com.garbcode.garbcodeapp\"/" "$PROJECT_ROOT/android/app/build.gradle"
+    sed -i '' "s/versionCode 1/versionCode 27/" "$PROJECT_ROOT/android/app/build.gradle"
+    sed -i '' "s/versionName \"1.0.0\"/versionName \"1.0.22\"/" "$PROJECT_ROOT/android/app/build.gradle"
+    
+    echo "✅ Flutter Android project initialized"
+}
+
 # Phase 1: Project Setup & Core Configuration
 setup_build_environment() {
     echo "Setting up build environment..."
@@ -88,49 +138,6 @@ setup_build_environment() {
     "${SCRIPT_DIR}/inject_permissions_android.sh" || handle_build_error "Failed to inject Android permissions"
     
     echo "✅ Build environment setup completed"
-}
-
-# Initialize Flutter Android project
-initialize_flutter_android() {
-    echo "Initializing Flutter Android project..."
-    
-    # Create a temporary directory
-    TEMP_DIR=$(mktemp -d)
-    echo "Created temporary directory: $TEMP_DIR"
-    
-    # Create a new Flutter project in the temp directory
-    cd "$TEMP_DIR"
-    flutter create --org com.garbcode --project-name garbcodeapp .
-    
-    # Ensure the android directory exists in the project
-    if [ ! -d "$PROJECT_ROOT/android" ]; then
-        mkdir -p "$PROJECT_ROOT/android"
-    fi
-    
-    # Copy the Android configuration files
-    echo "Copying Android configuration files..."
-    cp -r android/* "$PROJECT_ROOT/android/" || {
-        echo "❌ Failed to copy Android files"
-        cd "$PROJECT_ROOT"
-        rm -rf "$TEMP_DIR"
-        handle_build_error "Failed to copy Android files"
-    }
-    
-    # Clean up
-    cd "$PROJECT_ROOT"
-    rm -rf "$TEMP_DIR"
-    
-    # Update the application ID and version in build.gradle
-    if [ -f "$PROJECT_ROOT/android/app/build.gradle" ]; then
-        echo "Updating build.gradle configuration..."
-        sed -i '' "s/applicationId \"com.garbcode.garbcodeapp\"/applicationId \"com.garbcode.garbcodeapp\"/" "$PROJECT_ROOT/android/app/build.gradle"
-        sed -i '' "s/versionCode 1/versionCode 27/" "$PROJECT_ROOT/android/app/build.gradle"
-        sed -i '' "s/versionName \"1.0.0\"/versionName \"1.0.22\"/" "$PROJECT_ROOT/android/app/build.gradle"
-    else
-        handle_build_error "build.gradle not found"
-    fi
-    
-    echo "✅ Flutter Android project initialized"
 }
 
 # Download splash assets
@@ -241,11 +248,11 @@ echo "Starting Android build process..."
 # Make scripts executable
 make_scripts_executable
 
+# Initialize Flutter Android project first
+initialize_flutter_android
+
 # Setup build environment
 setup_build_environment
-
-# Initialize Flutter Android project
-initialize_flutter_android
 
 # Download splash assets
 download_splash_assets
