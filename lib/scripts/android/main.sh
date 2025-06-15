@@ -65,22 +65,38 @@ initialize_flutter_android() {
     
     # Create a new Flutter project in the temp directory
     cd "$TEMP_DIR"
+    echo "Creating Flutter project in temporary directory..."
     flutter create --org com.garbcode --project-name garbcodeapp .
+    
+    # Debug: List contents of temp directory
+    echo "Contents of temporary directory:"
+    ls -la "$TEMP_DIR"
+    
+    # Debug: List contents of android directory in temp
+    echo "Contents of android directory in temporary project:"
+    ls -la "$TEMP_DIR/android"
     
     # Ensure the android directory exists in the project
     if [ ! -d "$PROJECT_ROOT/android" ]; then
+        echo "Creating android directory in project root..."
         mkdir -p "$PROJECT_ROOT/android"
     fi
     
     # Copy the Android configuration files
     echo "Copying Android configuration files..."
     if [ -d "$TEMP_DIR/android" ]; then
-        cp -r "$TEMP_DIR/android/"* "$PROJECT_ROOT/android/" || {
+        echo "Found android directory in temporary project"
+        echo "Copying from $TEMP_DIR/android to $PROJECT_ROOT/android"
+        cp -rv "$TEMP_DIR/android/"* "$PROJECT_ROOT/android/" || {
             echo "❌ Failed to copy Android files"
             cd "$PROJECT_ROOT"
             rm -rf "$TEMP_DIR"
             handle_build_error "Failed to copy Android files"
         }
+        
+        # Debug: List contents of project's android directory after copy
+        echo "Contents of project's android directory after copy:"
+        ls -la "$PROJECT_ROOT/android"
     else
         cd "$PROJECT_ROOT"
         rm -rf "$TEMP_DIR"
@@ -92,7 +108,9 @@ initialize_flutter_android() {
     rm -rf "$TEMP_DIR"
     
     # Verify build.gradle exists
+    echo "Verifying build.gradle exists..."
     if [ ! -f "$PROJECT_ROOT/android/app/build.gradle" ]; then
+        echo "❌ build.gradle not found at $PROJECT_ROOT/android/app/build.gradle"
         handle_build_error "build.gradle not found after project initialization"
     fi
     
