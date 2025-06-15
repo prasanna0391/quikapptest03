@@ -29,9 +29,11 @@ echo "-------------------------------------------------"
 
 # --- Common Gradle Configuration ---
 echo "✍️ Writing root Gradle files..."
-cat <<EOF > android/settings.gradle.kts
+
+# Create settings.gradle.kts
+cat > android/settings.gradle.kts << 'EOF'
 pluginManagement {
-    includeBuild("$FLUTTER_ROOT/packages/flutter_tools/gradle")
+    includeBuild("${FLUTTER_ROOT}/packages/flutter_tools/gradle")
     repositories {
         google()
         mavenCentral()
@@ -42,12 +44,19 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "8.3.0" apply false
     id("org.jetbrains.kotlin.android") version "1.9.22" apply false
-    ${PUSH_NOTIFY == "true" ? 'id("com.google.gms.google-services") version "4.4.2" apply false' : ''}
+EOF
+
+if [ "${PUSH_NOTIFY}" = "true" ]; then
+    echo '    id("com.google.gms.google-services") version "4.4.2" apply false' >> android/settings.gradle.kts
+fi
+
+cat >> android/settings.gradle.kts << 'EOF'
 }
 include(":app")
 EOF
 
-cat <<'EOF' > android/build.gradle.kts
+# Create build.gradle.kts
+cat > android/build.gradle.kts << 'EOF'
 allprojects {
     repositories {
         google()
@@ -59,8 +68,8 @@ tasks.register<Delete>("clean") {
 }
 EOF
 
-# --- Generate app/build.gradle.kts with Correct Configuration ---
-cat <<EOF > android/app/build.gradle.kts
+# Create app/build.gradle.kts
+cat > android/app/build.gradle.kts << 'EOF'
 import java.util.Properties
 import java.io.FileInputStream
 import java.io.File
@@ -93,7 +102,13 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
-    ${PUSH_NOTIFY == "true" ? 'id("com.google.gms.google-services")' : ''}
+EOF
+
+if [ "${PUSH_NOTIFY}" = "true" ]; then
+    echo '    id("com.google.gms.google-services")' >> android/app/build.gradle.kts
+fi
+
+cat >> android/app/build.gradle.kts << 'EOF'
 }
 
 android {
@@ -172,12 +187,18 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    ${PUSH_NOTIFY == "true" ? 'implementation(platform("com.google.firebase:firebase-bom:32.7.4"))' : ''}
+EOF
+
+if [ "${PUSH_NOTIFY}" = "true" ]; then
+    echo '    implementation(platform("com.google.firebase:firebase-bom:32.7.4"))' >> android/app/build.gradle.kts
+fi
+
+cat >> android/app/build.gradle.kts << 'EOF'
 }
 EOF
 
-# Create gradle.properties with appropriate settings
-cat <<EOF > android/gradle.properties
+# Create gradle.properties
+cat > android/gradle.properties << 'EOF'
 org.gradle.jvmargs=-Xmx1536M
 android.useAndroidX=true
 android.enableJetifier=true
