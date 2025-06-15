@@ -346,6 +346,94 @@ configure_email_settings() {
     fi
 }
 
+# Setup build environment
+setup_build_environment() {
+    echo "Setting up build environment..."
+    
+    # Set Flutter version
+    if [ -n "${FLUTTER_VERSION:-}" ]; then
+        echo "Using Flutter version: ${FLUTTER_VERSION}"
+        flutter version ${FLUTTER_VERSION}
+    fi
+    
+    # Set Gradle version
+    if [ -n "${GRADLE_VERSION:-}" ]; then
+        echo "Using Gradle version: ${GRADLE_VERSION}"
+        sed -i '' "s/gradle-.*-all.zip/gradle-${GRADLE_VERSION}-all.zip/g" android/gradle/wrapper/gradle-wrapper.properties
+    fi
+    
+    # Set Java version
+    if [ -n "${JAVA_VERSION:-}" ]; then
+        echo "Using Java version: ${JAVA_VERSION}"
+        export JAVA_HOME=$(/usr/libexec/java_home -v ${JAVA_VERSION})
+    fi
+    
+    # Set Android SDK versions
+    if [ -n "${ANDROID_COMPILE_SDK:-}" ]; then
+        echo "Using Android compile SDK: ${ANDROID_COMPILE_SDK}"
+        sed -i '' "s/compileSdkVersion .*/compileSdkVersion ${ANDROID_COMPILE_SDK}/g" android/app/build.gradle
+    fi
+    
+    if [ -n "${ANDROID_MIN_SDK:-}" ]; then
+        echo "Using Android min SDK: ${ANDROID_MIN_SDK}"
+        sed -i '' "s/minSdkVersion .*/minSdkVersion ${ANDROID_MIN_SDK}/g" android/app/build.gradle
+    fi
+    
+    if [ -n "${ANDROID_TARGET_SDK:-}" ]; then
+        echo "Using Android target SDK: ${ANDROID_TARGET_SDK}"
+        sed -i '' "s/targetSdkVersion .*/targetSdkVersion ${ANDROID_TARGET_SDK}/g" android/app/build.gradle
+    fi
+    
+    # Set build tools version
+    if [ -n "${ANDROID_BUILD_TOOLS:-}" ]; then
+        echo "Using Android build tools: ${ANDROID_BUILD_TOOLS}"
+        sed -i '' "s/buildToolsVersion .*/buildToolsVersion \"${ANDROID_BUILD_TOOLS}\"/g" android/app/build.gradle
+    fi
+    
+    # Set NDK version
+    if [ -n "${ANDROID_NDK_VERSION:-}" ]; then
+        echo "Using Android NDK version: ${ANDROID_NDK_VERSION}"
+        sed -i '' "s/ndkVersion .*/ndkVersion \"${ANDROID_NDK_VERSION}\"/g" android/app/build.gradle
+    fi
+    
+    # Set command line tools version
+    if [ -n "${ANDROID_CMDLINE_TOOLS:-}" ]; then
+        echo "Using Android command line tools: ${ANDROID_CMDLINE_TOOLS}"
+        sed -i '' "s/cmdline-tools;.*/cmdline-tools;${ANDROID_CMDLINE_TOOLS}/g" android/app/build.gradle
+    fi
+    
+    # Update app configuration
+    if [ -n "${APP_NAME:-}" ]; then
+        echo "Setting app name: ${APP_NAME}"
+        sed -i '' "s/applicationId .*/applicationId \"${PKG_NAME}\"/g" android/app/build.gradle
+        sed -i '' "s/label: .*/label: \"${APP_NAME}\"/g" android/app/src/main/AndroidManifest.xml
+    fi
+    
+    # Update version information
+    if [ -n "${VERSION_NAME:-}" ]; then
+        echo "Setting version name: ${VERSION_NAME}"
+        sed -i '' "s/versionName .*/versionName \"${VERSION_NAME}\"/g" android/app/build.gradle
+    fi
+    
+    if [ -n "${VERSION_CODE:-}" ]; then
+        echo "Setting version code: ${VERSION_CODE}"
+        sed -i '' "s/versionCode .*/versionCode ${VERSION_CODE}/g" android/app/build.gradle
+    fi
+    
+    # Configure keystore if provided
+    if [ -n "${KEY_STORE:-}" ]; then
+        echo "Configuring keystore..."
+        cat > android/key.properties << EOL
+storePassword=${CM_KEYSTORE_PASSWORD}
+keyPassword=${CM_KEY_PASSWORD}
+keyAlias=${CM_KEY_ALIAS}
+storeFile=${KEY_STORE}
+EOL
+    fi
+    
+    echo "✅ Build environment setup completed"
+}
+
 # Main build process
 main() {
     echo "🚀 Starting Android build process..."
