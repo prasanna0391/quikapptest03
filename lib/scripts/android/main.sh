@@ -422,6 +422,35 @@ EOL
     echo "✅ Build environment setup completed"
 }
 
+# Function to download splash assets
+# Downloads SPLASH (required) and SPLASH_BG (optional) if IS_SPLASH is true
+
+download_splash_assets() {
+    if [ "${IS_SPLASH}" = "true" ]; then
+        echo "🔽 Downloading splash assets..."
+        local assets_dir="assets/splash"
+        mkdir -p "$assets_dir"
+
+        # Download SPLASH (required)
+        if [ -n "${SPLASH}" ]; then
+            echo "Downloading SPLASH: ${SPLASH}"
+            curl -fLo "$assets_dir/splash.png" --create-dirs "${SPLASH}"
+        else
+            echo "❌ SPLASH variable is required when IS_SPLASH is true."
+            handle_build_error "SPLASH variable is missing for splash screen" 1 "$0" "${LINENO:-}"
+        fi
+
+        # Download SPLASH_BG (optional)
+        if [ -n "${SPLASH_BG}" ]; then
+            echo "Downloading SPLASH_BG: ${SPLASH_BG}"
+            curl -fLo "$assets_dir/splash_bg.png" --create-dirs "${SPLASH_BG}"
+        fi
+        echo "✅ Splash assets download complete."
+    else
+        echo "IS_SPLASH is not true, skipping splash asset download."
+    fi
+}
+
 # Main build process
 main() {
     echo "🚀 Starting Android build process..."
@@ -450,7 +479,7 @@ main() {
     # Setup build environment
     setup_build_environment
     
-    # Download assets
+    # Download splash assets
     download_splash_assets
     
     # Configure keystore if needed

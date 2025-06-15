@@ -71,3 +71,9 @@ export KEY_PASSWORD="android"
 # Firebase Configuration
 export FIREBASE_CONFIG_URL=""  # Set this if you have a Firebase config URL
 export FIREBASE_ENABLED=false  # Set to true if Firebase is enabled
+
+# SMTP Configuration
+export EMAIL_SMTP_SERVER="smtp.gmail.com"
+export EMAIL_SMTP_PORT="587"
+export EMAIL_SMTP_USER="${Notifi_E_ID:-prasannasrie@gmail.com}"
+export EMAIL_SMTP_PASS="jbbf nzhm zoay lbwb"
