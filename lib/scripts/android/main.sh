@@ -10,52 +10,269 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# Error handling function
-handle_build_error() {
-    local error_message="$1"
-    echo "❌ Build Error: $error_message"
-    echo "📧 Sending error notification to ${EMAIL_ID:-prasannasrinivasan32@gmail.com}"
+# Validate required variables
+validate_required_variables() {
+    echo "Validating required variables..."
     
-    # Send email notification
-    if [ -f "${SCRIPT_DIR}/email_config.sh" ]; then
-        source "${SCRIPT_DIR}/email_config.sh"
-        echo "✅ Android email configuration loaded successfully"
-        echo "📧 Preparing error notification email..."
-        echo "📤 Sending email..."
-        echo "✅ Email sent successfully!"
-        echo "📧 Email sent to: ${EMAIL_ID:-prasannasrinivasan32@gmail.com}"
-        echo "📧 Subject: ❌ QuikApp Build Failed - ${APP_NAME:-QuikApp} (QuikApp Build)"
+    # App Configuration Variables
+    local required_vars=(
+        "VERSION_NAME"
+        "VERSION_CODE"
+        "APP_NAME"
+        "ORG_NAME"
+        "WEB_URL"
+        "PKG_NAME"
+        "BUNDLE_ID"
+        "EMAIL_ID"
+    )
+    
+    # Feature Flags
+    local feature_flags=(
+        "PUSH_NOTIFY"
+        "IS_CHATBOT"
+        "IS_DEEPLINK"
+        "IS_SPLASH"
+        "IS_PULLDOWN"
+        "IS_BOTTOMMENU"
+        "IS_LOAD_IND"
+    )
+    
+    # Permission Flags
+    local permission_flags=(
+        "IS_CAMERA"
+        "IS_LOCATION"
+        "IS_MIC"
+        "IS_NOTIFICATION"
+        "IS_CONTACT"
+        "IS_BIOMETRIC"
+        "IS_CALENDAR"
+        "IS_STORAGE"
+    )
+    
+    # Branding Variables
+    local branding_vars=(
+        "LOGO_URL"
+        "SPLASH_URL"
+        "SPLASH_BG"
+        "SPLASH_BG_COLOR"
+        "SPLASH_TAGLINE"
+        "SPLASH_TAGLINE_COLOR"
+        "SPLASH_ANIMATION"
+        "SPLASH_DURATION"
+    )
+    
+    # UI Configuration
+    local ui_config_vars=(
+        "BOTTOMMENU_ITEMS"
+        "BOTTOMMENU_BG_COLOR"
+        "BOTTOMMENU_ICON_COLOR"
+        "BOTTOMMENU_TEXT_COLOR"
+        "BOTTOMMENU_FONT"
+        "BOTTOMMENU_FONT_SIZE"
+        "BOTTOMMENU_FONT_BOLD"
+        "BOTTOMMENU_FONT_ITALIC"
+        "BOTTOMMENU_ACTIVE_TAB_COLOR"
+        "BOTTOMMENU_ICON_POSITION"
+        "BOTTOMMENU_VISIBLE_ON"
+    )
+    
+    # Firebase Configuration
+    local firebase_vars=(
+        "FIREBASE_CONFIG_ANDROID"
+        "FIREBASE_CONFIG_IOS"
+    )
+    
+    # Android Keystore Variables
+    local keystore_vars=(
+        "KEY_STORE"
+        "CM_KEYSTORE_PASSWORD"
+        "CM_KEY_ALIAS"
+        "CM_KEY_PASSWORD"
+    )
+    
+    # Admin Variables
+    local admin_vars=(
+        "CM_BUILD_DIR"
+        "BUILD_MODE"
+        "FLUTTER_VERSION"
+        "GRADLE_VERSION"
+        "JAVA_VERSION"
+        "ANDROID_COMPILE_SDK"
+        "ANDROID_MIN_SDK"
+        "ANDROID_TARGET_SDK"
+        "ANDROID_BUILD_TOOLS"
+        "ANDROID_NDK_VERSION"
+        "ANDROID_CMDLINE_TOOLS"
+    )
+    
+    # Function to check variables
+    check_variables() {
+        local -n vars=$1
+        local category=$2
+        local missing=()
+        
+        for var in "${vars[@]}"; do
+            if [ -z "${!var:-}" ]; then
+                missing+=("$var")
+            fi
+        done
+        
+        if [ ${#missing[@]} -gt 0 ]; then
+            echo "⚠️ Missing $category variables:"
+            printf '%s\n' "${missing[@]}"
+            return 1
+        fi
+        return 0
+    }
+    
+    # Check all variable categories
+    local has_errors=0
+    
+    echo "Checking App Configuration Variables..."
+    check_variables required_vars "App Configuration" || has_errors=1
+    
+    echo "Checking Feature Flags..."
+    check_variables feature_flags "Feature Flags" || has_errors=1
+    
+    echo "Checking Permission Flags..."
+    check_variables permission_flags "Permission Flags" || has_errors=1
+    
+    echo "Checking Branding Variables..."
+    check_variables branding_vars "Branding" || has_errors=1
+    
+    echo "Checking UI Configuration Variables..."
+    check_variables ui_config_vars "UI Configuration" || has_errors=1
+    
+    # Check Firebase variables if push notifications are enabled
+    if [ "${PUSH_NOTIFY:-}" = "true" ]; then
+        echo "Checking Firebase Configuration..."
+        check_variables firebase_vars "Firebase" || has_errors=1
     fi
     
-    exit 1
+    # Check Keystore variables if needed
+    if [ "${PUSH_NOTIFY:-}" = "true" ] || [ "${KEY_STORE:-}" != "" ]; then
+        echo "Checking Keystore Variables..."
+        check_variables keystore_vars "Keystore" || has_errors=1
+    fi
+    
+    echo "Checking Admin Variables..."
+    check_variables admin_vars "Admin" || has_errors=1
+    
+    if [ $has_errors -eq 1 ]; then
+        handle_build_error "Missing required variables" 1 "$0" "${LINENO:-}"
+    fi
+    
+    echo "✅ All required variables validated"
 }
 
-# Create necessary directories
-echo "Creating required directories..."
-mkdir -p "$PROJECT_ROOT/assets"
-mkdir -p "$PROJECT_ROOT/assets/images"
-mkdir -p "$PROJECT_ROOT/android/app/src/main/res/mipmap-hdpi"
-mkdir -p "$PROJECT_ROOT/android/app/src/main/res/mipmap-mdpi"
-mkdir -p "$PROJECT_ROOT/android/app/src/main/res/mipmap-xhdpi"
-mkdir -p "$PROJECT_ROOT/android/app/src/main/res/mipmap-xxhdpi"
-mkdir -p "$PROJECT_ROOT/android/app/src/main/res/mipmap-xxxhdpi"
-mkdir -p "$PROJECT_ROOT/android/app/src/main/res/drawable"
-mkdir -p "$PROJECT_ROOT/android/app/src/main/res/values"
-mkdir -p "$PROJECT_ROOT/android/app/src/main/kotlin/com/garbcode/garbcodeapp"
-echo "✅ Required directories created"
+# Load environment variables from API with improved error handling
+load_env_variables() {
+    echo "Loading environment variables from API..."
+    
+    # Try to load from API first
+    if [ -n "${API_URL:-}" ]; then
+        echo "Fetching variables from API..."
+        API_RESPONSE=$(curl -s "${API_URL}/config" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${API_TOKEN:-}")
+        
+        if [ $? -eq 0 ] && [ -n "$API_RESPONSE" ]; then
+            # Export variables from API response
+            eval "$(echo "$API_RESPONSE" | jq -r 'to_entries | .[] | "export \(.key)=\(.value)"')"
+            echo "✅ Environment variables loaded from API"
+        else
+            echo "⚠️ Failed to load variables from API, using defaults"
+            source "${SCRIPT_DIR}/admin_vars.sh"
+        fi
+    else
+        echo "⚠️ API_URL not set, using defaults"
+        source "${SCRIPT_DIR}/admin_vars.sh"
+    fi
+    
+    # Validate all required variables
+    validate_required_variables
+}
 
-# Make all .sh files executable
+# Enhanced error handling function
+handle_build_error() {
+    local error_message="$1"
+    local error_code="${2:-1}"
+    local error_file="${3:-}"
+    local error_line="${4:-}"
+    
+    echo "❌ Build Error: $error_message"
+    if [ -n "$error_file" ] && [ -n "$error_line" ]; then
+        echo "📄 Error location: $error_file:$error_line"
+    fi
+    
+    # Capture build logs
+    echo "📝 Capturing build logs..."
+    "${SCRIPT_DIR}/capture_build_logs.sh" || echo "⚠️ Failed to capture build logs"
+    
+    # Send error notification
+    echo "📧 Sending error notification to ${EMAIL_ID:-}"
+    if [ -f "${SCRIPT_DIR}/send_error_email.sh" ]; then
+        "${SCRIPT_DIR}/send_error_email.sh" "$error_message" "$error_code" "$error_file" "$error_line" || {
+            echo "⚠️ Failed to send error email"
+        }
+    fi
+    
+    exit "$error_code"
+}
+
+# Create necessary directories with error handling
+create_directories() {
+    echo "Creating required directories..."
+    local dirs=(
+        "$PROJECT_ROOT/assets"
+        "$PROJECT_ROOT/assets/images"
+        "$PROJECT_ROOT/android/app/src/main/res/mipmap-hdpi"
+        "$PROJECT_ROOT/android/app/src/main/res/mipmap-mdpi"
+        "$PROJECT_ROOT/android/app/src/main/res/mipmap-xhdpi"
+        "$PROJECT_ROOT/android/app/src/main/res/mipmap-xxhdpi"
+        "$PROJECT_ROOT/android/app/src/main/res/mipmap-xxxhdpi"
+        "$PROJECT_ROOT/android/app/src/main/res/drawable"
+        "$PROJECT_ROOT/android/app/src/main/res/values"
+        "$PROJECT_ROOT/android/app/src/main/kotlin/com/garbcode/garbcodeapp"
+    )
+    
+    for dir in "${dirs[@]}"; do
+        if ! mkdir -p "$dir"; then
+            handle_build_error "Failed to create directory: $dir" 1 "$0" "${LINENO:-}"
+        fi
+    done
+    echo "✅ Required directories created"
+}
+
+# Make scripts executable with error handling
 make_scripts_executable() {
     echo "Making scripts executable..."
-    chmod +x "${SCRIPT_DIR}/debug_env.sh"
-    chmod +x "${SCRIPT_DIR}/inject_manifast_template.sh"
-    chmod +x "${SCRIPT_DIR}/inject_permissions_android.sh"
-    chmod +x "${SCRIPT_DIR}/fix_v1_embedding.sh"
-    chmod +x "${SCRIPT_DIR}/configure_android_build_fixed.sh"
+    local scripts=(
+        "${SCRIPT_DIR}/debug_env.sh"
+        "${SCRIPT_DIR}/inject_manifast_template.sh"
+        "${SCRIPT_DIR}/inject_permissions_android.sh"
+        "${SCRIPT_DIR}/fix_v1_embedding.sh"
+        "${SCRIPT_DIR}/configure_android_build_fixed.sh"
+        "${SCRIPT_DIR}/inject_keystore.sh"
+        "${SCRIPT_DIR}/update_version.sh"
+        "${SCRIPT_DIR}/change_app_name.sh"
+        "${SCRIPT_DIR}/get_logo.sh"
+        "${SCRIPT_DIR}/get_splash.sh"
+    )
+    
+    for script in "${scripts[@]}"; do
+        if [ -f "$script" ]; then
+            if ! chmod +x "$script"; then
+                handle_build_error "Failed to make script executable: $script" 1 "$0" "${LINENO:-}"
+            fi
+        else
+            echo "⚠️ Script not found: $script"
+        fi
+    done
     echo "✅ Scripts made executable"
 }
 
-# Initialize Flutter Android project
+# Initialize Flutter Android project with enhanced error handling
 initialize_flutter_android() {
     echo "Initializing Flutter Android project..."
     
@@ -64,218 +281,189 @@ initialize_flutter_android() {
     echo "Created temporary directory: $TEMP_DIR"
     
     # Create a new Flutter project in the temp directory
-    cd "$TEMP_DIR"
+    cd "$TEMP_DIR" || handle_build_error "Failed to change to temp directory" 1 "$0" "${LINENO:-}"
+    
     echo "Creating Flutter project in temporary directory..."
-    flutter create --org com.garbcode --project-name garbcodeapp .
-    
-    # Debug: List contents of temp directory
-    echo "Contents of temporary directory:"
-    ls -la "$TEMP_DIR"
-    
-    # Debug: List contents of android directory in temp
-    echo "Contents of android directory in temporary project:"
-    ls -la "$TEMP_DIR/android"
-    
-    # Ensure the android directory exists in the project
-    if [ ! -d "$PROJECT_ROOT/android" ]; then
-        echo "Creating android directory in project root..."
-        mkdir -p "$PROJECT_ROOT/android"
+    if ! flutter create --org com.garbcode --project-name garbcodeapp .; then
+        cd "$PROJECT_ROOT"
+        rm -rf "$TEMP_DIR"
+        handle_build_error "Failed to create Flutter project" 1 "$0" "${LINENO:-}"
     fi
     
-    # Copy the Android configuration files
+    # Copy Android configuration files
     echo "Copying Android configuration files..."
     if [ -d "$TEMP_DIR/android" ]; then
-        echo "Found android directory in temporary project"
-        echo "Copying from $TEMP_DIR/android to $PROJECT_ROOT/android"
-        cp -rv "$TEMP_DIR/android/"* "$PROJECT_ROOT/android/" || {
-            echo "❌ Failed to copy Android files"
+        if ! cp -rv "$TEMP_DIR/android/"* "$PROJECT_ROOT/android/"; then
             cd "$PROJECT_ROOT"
             rm -rf "$TEMP_DIR"
-            handle_build_error "Failed to copy Android files"
-        }
-        
-        # Debug: List contents of project's android directory after copy
-        echo "Contents of project's android directory after copy:"
-        ls -la "$PROJECT_ROOT/android"
+            handle_build_error "Failed to copy Android files" 1 "$0" "${LINENO:-}"
+        fi
     else
         cd "$PROJECT_ROOT"
         rm -rf "$TEMP_DIR"
-        handle_build_error "Android directory not found in temporary Flutter project"
+        handle_build_error "Android directory not found in temporary Flutter project" 1 "$0" "${LINENO:-}"
     fi
     
     # Clean up
     cd "$PROJECT_ROOT"
     rm -rf "$TEMP_DIR"
     
-    # Verify build.gradle exists
-    echo "Verifying build.gradle exists..."
-    if [ ! -f "$PROJECT_ROOT/android/app/build.gradle" ]; then
-        echo "❌ build.gradle not found at $PROJECT_ROOT/android/app/build.gradle"
-        handle_build_error "build.gradle not found after project initialization"
+    # Update build.gradle configuration
+    echo "Updating build.gradle configuration..."
+    local BUILD_GRADLE_FILE
+    if [ -f "$PROJECT_ROOT/android/app/build.gradle.kts" ]; then
+        BUILD_GRADLE_FILE="$PROJECT_ROOT/android/app/build.gradle.kts"
+    elif [ -f "$PROJECT_ROOT/android/app/build.gradle" ]; then
+        BUILD_GRADLE_FILE="$PROJECT_ROOT/android/app/build.gradle"
+    else
+        handle_build_error "build.gradle or build.gradle.kts not found" 1 "$0" "${LINENO:-}"
     fi
     
-    # Update the application ID and version in build.gradle
-    echo "Updating build.gradle configuration..."
-    sed -i '' "s/applicationId \"com.garbcode.garbcodeapp\"/applicationId \"com.garbcode.garbcodeapp\"/" "$PROJECT_ROOT/android/app/build.gradle"
-    sed -i '' "s/versionCode 1/versionCode 27/" "$PROJECT_ROOT/android/app/build.gradle"
-    sed -i '' "s/versionName \"1.0.0\"/versionName \"1.0.22\"/" "$PROJECT_ROOT/android/app/build.gradle"
+    # Update version and application ID
+    "${SCRIPT_DIR}/update_version.sh" "$BUILD_GRADLE_FILE" || {
+        handle_build_error "Failed to update version in build.gradle" 1 "$0" "${LINENO:-}"
+    }
     
     echo "✅ Flutter Android project initialized"
 }
 
-# Phase 1: Project Setup & Core Configuration
-setup_build_environment() {
-    echo "Setting up build environment..."
+# Handle build mode configuration
+configure_build_mode() {
+    echo "Configuring build mode..."
     
-    # Source variables from admin panel
-    if [ -f "${SCRIPT_DIR}/admin_vars.sh" ]; then
-        source "${SCRIPT_DIR}/admin_vars.sh"
-        echo "✅ Admin variables loaded successfully"
-    else
-        handle_build_error "admin_vars.sh not found"
-    fi
+    case "${BUILD_MODE:-}" in
+        "basic_apk")
+            echo "Configuring Basic APK build..."
+            export PUSH_NOTIFY="false"
+            export KEY_STORE=""
+            export OUTPUT_TYPES="apk"
+            ;;
+        "firebase_apk")
+            echo "Configuring Firebase APK build..."
+            export PUSH_NOTIFY="true"
+            export KEY_STORE=""
+            export OUTPUT_TYPES="apk"
+            ;;
+        "full_release")
+            echo "Configuring Full Release build..."
+            export PUSH_NOTIFY="true"
+            export OUTPUT_TYPES="apk,aab"
+            ;;
+        "aab_only")
+            echo "Configuring AAB Only build..."
+            export PUSH_NOTIFY="false"
+            export OUTPUT_TYPES="aab"
+            ;;
+        *)
+            handle_build_error "Invalid build mode: ${BUILD_MODE:-}" 1 "$0" "${LINENO:-}"
+            ;;
+    esac
     
-    # Run debug environment script
-    echo "Running debug environment check..."
-    "${SCRIPT_DIR}/debug_env.sh" || handle_build_error "Debug environment check failed"
-    
-    # Configure Android build files
-    echo "Configuring Android build files..."
-    "${SCRIPT_DIR}/configure_android_build_fixed.sh" || handle_build_error "Failed to configure Android build files"
-    
-    # Inject manifest template
-    echo "Injecting manifest template..."
-    "${SCRIPT_DIR}/inject_manifast_template.sh" || handle_build_error "Failed to inject manifest template"
-    
-    # Fix V1 embedding issues
-    echo "Fixing V1 embedding issues..."
-    "${SCRIPT_DIR}/fix_v1_embedding.sh" || handle_build_error "Failed to fix V1 embedding issues"
-    
-    # Inject permissions
-    echo "Injecting Android permissions..."
-    "${SCRIPT_DIR}/inject_permissions_android.sh" || handle_build_error "Failed to inject Android permissions"
-    
-    echo "✅ Build environment setup completed"
+    echo "✅ Build mode configured: ${BUILD_MODE:-}"
 }
 
-# Download splash assets
-download_splash_assets() {
-    echo "Downloading splash assets..."
+# Setup output directories
+setup_output_directories() {
+    echo "Setting up output directories..."
     
-    # Create assets directory if it doesn't exist
-    mkdir -p "${PROJECT_ROOT}/assets" || {
-        handle_build_error "Failed to create assets directory"
-    }
+    # Create output directory structure
+    local output_dirs=(
+        "${PROJECT_ROOT}/output"
+        "${PROJECT_ROOT}/output/apk"
+        "${PROJECT_ROOT}/output/aab"
+        "${PROJECT_ROOT}/output/logs"
+    )
     
-    # Function to download and verify asset
-    download_asset() {
-        local url="$1"
-        local output_path="$2"
-        local asset_name="$3"
-        
-        if [ -n "${url:-}" ]; then
-            echo "Downloading ${asset_name} from ${url}..."
-            
-            # Create directory if it doesn't exist
-            mkdir -p "$(dirname "${output_path}")" || {
-                handle_build_error "Failed to create directory for ${asset_name}"
-            }
-            
-            # Remove existing file if it exists
-            if [ -f "${output_path}" ]; then
-                echo "Removing existing ${asset_name}..."
-                rm -f "${output_path}" || {
-                    echo "⚠️ Failed to remove existing ${asset_name}, but continuing..."
-                }
-            fi
-            
-            # Download the asset
-            if curl -L "${url}" -o "${output_path}" --fail --silent --show-error; then
-                # Verify the downloaded file
-                if [ -f "${output_path}" ] && [ -s "${output_path}" ]; then
-                    echo "✅ ${asset_name} downloaded successfully"
-                    return 0
-                else
-                    handle_build_error "Failed to download ${asset_name}: File is empty or missing"
-                fi
-            else
-                handle_build_error "Failed to download ${asset_name} from ${url}"
-            fi
-        else
-            echo "⚠️ ${asset_name} URL not provided, skipping..."
-            return 0
+    for dir in "${output_dirs[@]}"; do
+        if ! mkdir -p "$dir"; then
+            handle_build_error "Failed to create output directory: $dir" 1 "$0" "${LINENO:-}"
         fi
-    }
+    done
     
-    # Check and download logo
-    if [ -n "${LOGO_URL:-}" ]; then
-        download_asset "${LOGO_URL}" "${PROJECT_ROOT}/assets/logo.png" "Logo" || {
-            handle_build_error "Failed to download logo"
-        }
-    else
-        handle_build_error "LOGO_URL not set in environment variables"
-    fi
+    # Set output paths
+    export APK_OUTPUT_PATH="${PROJECT_ROOT}/output/apk"
+    export AAB_OUTPUT_PATH="${PROJECT_ROOT}/output/aab"
+    export LOG_OUTPUT_PATH="${PROJECT_ROOT}/output/logs"
     
-    # Check and download splash screen
-    if [ -n "${SPLASH:-}" ]; then
-        download_asset "${SPLASH}" "${PROJECT_ROOT}/assets/splash.png" "Splash Screen" || {
-            echo "⚠️ Failed to download splash screen, but continuing..."
-        }
-    else
-        echo "⚠️ SPLASH not set in environment variables"
-    fi
-    
-    # Check and download splash background (optional)
-    if [ -n "${SPLASH_BG:-}" ] && [ "${SPLASH_BG}" != "NULL" ]; then
-        download_asset "${SPLASH_BG}" "${PROJECT_ROOT}/assets/splash_bg.png" "Splash Background" || {
-            echo "⚠️ Failed to download splash background, but continuing..."
-        }
-    else
-        echo "ℹ️ SPLASH_BG not set or is NULL in environment variables (optional)"
-    fi
-    
-    # Verify logo was downloaded
-    if [ ! -f "${PROJECT_ROOT}/assets/logo.png" ]; then
-        handle_build_error "Logo was not downloaded successfully"
-    fi
-    
-    echo "✅ Asset download process completed"
+    echo "✅ Output directories configured"
 }
 
-# Generate launcher icons
-generate_launcher_icons() {
-    echo "Generating launcher icons..."
+# Handle build outputs
+handle_build_outputs() {
+    echo "Handling build outputs..."
     
-    # Check if flutter_launcher_icons is in pubspec.yaml
-    if ! grep -q "flutter_launcher_icons" "${PROJECT_ROOT}/pubspec.yaml"; then
-        handle_build_error "flutter_launcher_icons not found in pubspec.yaml"
+    # Move APK if needed
+    if [[ "${OUTPUT_TYPES:-}" == *"apk"* ]]; then
+        echo "Moving APK to output directory..."
+        if ! mv "${PROJECT_ROOT}/build/app/outputs/flutter-apk/app-release.apk" "${APK_OUTPUT_PATH}/app-${VERSION_NAME:-}-${VERSION_CODE:-}.apk"; then
+            handle_build_error "Failed to move APK to output directory" 1 "$0" "${LINENO:-}"
+        fi
     fi
     
-    # Run icon generation
-    cd "$PROJECT_ROOT"
-    flutter pub run flutter_launcher_icons:main || {
-        handle_build_error "Failed to generate launcher icons"
-    }
+    # Move AAB if needed
+    if [[ "${OUTPUT_TYPES:-}" == *"aab"* ]]; then
+        echo "Moving AAB to output directory..."
+        if ! mv "${PROJECT_ROOT}/build/app/outputs/bundle/release/app-release.aab" "${AAB_OUTPUT_PATH}/app-${VERSION_NAME:-}-${VERSION_CODE:-}.aab"; then
+            handle_build_error "Failed to move AAB to output directory" 1 "$0" "${LINENO:-}"
+        fi
+    fi
     
-    echo "✅ Launcher icons generated successfully"
+    # Copy build logs
+    echo "Copying build logs..."
+    if ! cp "${PROJECT_ROOT}/build.log" "${LOG_OUTPUT_PATH}/build-${VERSION_NAME:-}-${VERSION_CODE:-}.log"; then
+        echo "⚠️ Failed to copy build logs, but continuing..."
+    fi
+    
+    echo "✅ Build outputs handled"
 }
 
-# Main execution
-echo "Starting Android build process..."
+# Main build process
+main() {
+    echo "🚀 Starting Android build process..."
+    
+    # Load environment variables
+    load_env_variables
+    
+    # Configure build mode
+    configure_build_mode
+    
+    # Setup output directories
+    setup_output_directories
+    
+    # Create directories
+    create_directories
+    
+    # Make scripts executable
+    make_scripts_executable
+    
+    # Initialize Flutter Android project
+    initialize_flutter_android
+    
+    # Setup build environment
+    setup_build_environment
+    
+    # Download assets
+    download_splash_assets
+    
+    # Configure keystore if needed
+    if [ "${PUSH_NOTIFY:-}" = "true" ] || [ "${KEY_STORE:-}" != "" ]; then
+        echo "Configuring keystore..."
+        "${SCRIPT_DIR}/inject_keystore.sh" || {
+            handle_build_error "Failed to configure keystore" 1 "$0" "${LINENO:-}"
+        }
+    fi
+    
+    # Build the app
+    echo "Building Android app..."
+    "${SCRIPT_DIR}/build.sh" || {
+        handle_build_error "Build failed" 1 "$0" "${LINENO:-}"
+    }
+    
+    # Handle build outputs
+    handle_build_outputs
+    
+    echo "✅ Android build completed successfully"
+}
 
-# Make scripts executable
-make_scripts_executable
-
-# Initialize Flutter Android project first
-initialize_flutter_android
-
-# Setup build environment
-setup_build_environment
-
-# Download splash assets
-download_splash_assets
-
-# Generate launcher icons
-generate_launcher_icons
-
-echo "✅ Android build process completed successfully"
+# Run main function
+main
