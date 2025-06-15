@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Ensure CM_BUILD_DIR is set
-if [ -z "$CM_BUILD_DIR" ]; then
-    CM_BUILD_DIR="$PWD"
-fi
+# Set default CM_BUILD_DIR if not provided
+export CM_BUILD_DIR="${CM_BUILD_DIR:-$PWD}"
 
 # Build Configuration
 export BUILD_MODE="app-store"

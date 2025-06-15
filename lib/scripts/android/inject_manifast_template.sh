@@ -13,6 +13,8 @@ cat <<EOF > "$TARGET_FILE"
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.garbcode.garbcodeapp">
 
+    <!--PERMISSIONS-->
+
     <application
         android:name=".MainApplication"
         android:label="My Flutter App"
@@ -45,7 +47,7 @@ cat <<EOF > "$TARGET_FILE"
             android:name="flutterEmbedding"
             android:value="2" />
 
-        </application>
+    </application>
 </manifest>
 EOF
 

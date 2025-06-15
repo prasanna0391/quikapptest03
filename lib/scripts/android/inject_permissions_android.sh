@@ -15,6 +15,9 @@ if [ ! -f "$TEMPLATE_FILE" ]; then
     exit 1
 fi
 
+# Create a backup of the template
+cp "$TEMPLATE_FILE" "${TEMPLATE_FILE}.backup"
+
 PERMISSIONS_RAW_LINES=""
 
 # --- Collect Permissions Based on Environment Variables ---
@@ -56,24 +59,23 @@ sed -i '' 's@android:name=\".*MainActivity\"@android:name=\".MainActivity\"@' "$
 printf %s "$PERMISSIONS_RAW_LINES" > "$TEMP_PERMISSIONS_FILE"
 
 # Inject permissions into the template
-awk '
-/<!--PERMISSIONS-->/{
-    system("cat " insert_file);
-    found_placeholder = 1;
-    next;
-}
-{
-    print $0;
-}
-END {
-    if (found_placeholder == 0) {
-        print "ERROR: Placeholder not found in template!" > "/dev/stderr";
-        exit 1;
-    }
-}' insert_file="$TEMP_PERMISSIONS_FILE" "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+if ! grep -q "<!--PERMISSIONS-->" "$TEMPLATE_FILE"; then
+    echo "❌ Error: Permissions placeholder not found in template"
+    mv "${TEMPLATE_FILE}.backup" "$TEMPLATE_FILE"
+    rm -f "$TEMP_PERMISSIONS_FILE"
+    exit 1
+fi
+
+# Replace the placeholder with the permissions
+sed -i '' "/<!--PERMISSIONS-->/r $TEMP_PERMISSIONS_FILE" "$TEMPLATE_FILE"
+sed -i '' "s/<!--PERMISSIONS-->//" "$TEMPLATE_FILE"
+
+# Copy the modified template to the output file
+cp "$TEMPLATE_FILE" "$OUTPUT_FILE"
 
 # Clean up temporary file
-rm "$TEMP_PERMISSIONS_FILE"
+rm -f "$TEMP_PERMISSIONS_FILE"
+rm -f "${TEMPLATE_FILE}.backup"
 
 # --- Update app label ---
 APP_LABEL_FINAL="${APP_NAME:-My Flutter App}"
