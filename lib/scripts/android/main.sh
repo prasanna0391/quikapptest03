@@ -9,6 +9,33 @@ fi
 # Get the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Initialize Flutter Android project
+initialize_flutter_android() {
+    echo "Initializing Flutter Android project..."
+    
+    # Create a temporary directory
+    TEMP_DIR=$(mktemp -d)
+    echo "Created temporary directory: $TEMP_DIR"
+    
+    # Create a new Flutter project in the temp directory
+    cd "$TEMP_DIR"
+    flutter create --org com.garbcode --project-name garbcodeapp .
+    
+    # Copy the Android configuration files
+    cp -r android/* "$SCRIPT_DIR/../../android/"
+    
+    # Clean up
+    cd "$SCRIPT_DIR/../../"
+    rm -rf "$TEMP_DIR"
+    
+    # Update the application ID and version in build.gradle
+    sed -i '' "s/applicationId \"com.garbcode.garbcodeapp\"/applicationId \"com.garbcode.garbcodeapp\"/" android/app/build.gradle
+    sed -i '' "s/versionCode 1/versionCode 27/" android/app/build.gradle
+    sed -i '' "s/versionName \"1.0.0\"/versionName \"1.0.22\"/" android/app/build.gradle
+    
+    echo "✅ Flutter Android project initialized"
+}
+
 # Create necessary directories
 echo "Creating required directories..."
 mkdir -p assets
@@ -1142,7 +1169,7 @@ main() {
     
     # Phase 1: Project Setup & Core Configuration
     setup_build_environment || handle_build_error "Failed to setup build environment"
-    setup_android_gradle
+    initialize_flutter_android
     download_splash_assets || handle_build_error "Failed to download splash assets"
     generate_launcher_icons || handle_build_error "Failed to generate launcher icons"
     
