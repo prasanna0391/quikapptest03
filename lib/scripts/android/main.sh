@@ -51,6 +51,7 @@ make_scripts_executable() {
     chmod +x "${SCRIPT_DIR}/inject_manifast_template.sh"
     chmod +x "${SCRIPT_DIR}/inject_permissions_android.sh"
     chmod +x "${SCRIPT_DIR}/fix_v1_embedding.sh"
+    chmod +x "${SCRIPT_DIR}/configure_android_build_fixed.sh"
     echo "✅ Scripts made executable"
 }
 
@@ -127,7 +128,7 @@ initialize_flutter_android() {
         sed -i '' "s/versionName \"1.0.0\"/versionName \"1.0.22\"/" "$PROJECT_ROOT/android/app/build.gradle"
     else
         handle_build_error "build.gradle not found"
-    }
+    fi
     
     echo "✅ Flutter Android project initialized"
 }
@@ -174,7 +175,7 @@ download_splash_assets() {
                 fi
             else
                 handle_build_error "Failed to download ${asset_name} from ${url}"
-            }
+            fi
         else
             echo "⚠️ ${asset_name} URL not provided, skipping..."
             return 0
