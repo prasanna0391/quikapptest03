@@ -9,6 +9,20 @@ fi
 # Get the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Create necessary directories
+echo "Creating required directories..."
+mkdir -p assets
+mkdir -p assets/images
+mkdir -p android/app/src/main/res/mipmap-hdpi
+mkdir -p android/app/src/main/res/mipmap-mdpi
+mkdir -p android/app/src/main/res/mipmap-xhdpi
+mkdir -p android/app/src/main/res/mipmap-xxhdpi
+mkdir -p android/app/src/main/res/mipmap-xxxhdpi
+mkdir -p android/app/src/main/res/drawable
+mkdir -p android/app/src/main/res/values
+mkdir -p android/app/src/main/kotlin/com/garbcode/garbcodeapp
+echo "✅ Required directories created"
+
 # Make all .sh files executable
 make_scripts_executable() {
     print_section "Making scripts executable"
@@ -163,6 +177,12 @@ download_splash_assets() {
         if [ -n "${url:-}" ]; then
             echo "Downloading ${asset_name} from ${url}..."
             
+            # Create directory if it doesn't exist
+            mkdir -p "$(dirname "${output_path}")" || {
+                echo "❌ Failed to create directory for ${asset_name}"
+                return 1
+            }
+            
             # Remove existing file if it exists
             if [ -f "${output_path}" ]; then
                 echo "Removing existing ${asset_name}..."
@@ -194,10 +214,12 @@ download_splash_assets() {
     # Check and download logo
     if [ -n "${LOGO_URL:-}" ]; then
         download_asset "${LOGO_URL}" "${ASSETS_DIR}/logo.png" "Logo" || {
-            echo "⚠️ Failed to download logo, but continuing..."
+            echo "❌ Failed to download logo"
+            return 1
         }
     else
-        echo "⚠️ LOGO_URL not set in environment variables"
+        echo "❌ LOGO_URL not set in environment variables"
+        return 1
     fi
     
     # Check and download splash screen
@@ -210,17 +232,17 @@ download_splash_assets() {
     fi
     
     # Check and download splash background (optional)
-    if [ -n "${SPLASH_BG:-}" ]; then
+    if [ -n "${SPLASH_BG:-}" ] && [ "${SPLASH_BG}" != "NULL" ]; then
         download_asset "${SPLASH_BG}" "${ASSETS_DIR}/splash_bg.png" "Splash Background" || {
             echo "⚠️ Failed to download splash background, but continuing..."
         }
     else
-        echo "ℹ️ SPLASH_BG not set in environment variables (optional)"
+        echo "ℹ️ SPLASH_BG not set or is NULL in environment variables (optional)"
     fi
     
-    # Verify at least one asset was downloaded
-    if [ ! -f "${ASSETS_DIR}/logo.png" ] && [ ! -f "${ASSETS_DIR}/splash.png" ]; then
-        echo "❌ No required assets were downloaded"
+    # Verify logo was downloaded
+    if [ ! -f "${ASSETS_DIR}/logo.png" ]; then
+        echo "❌ Logo was not downloaded successfully"
         return 1
     fi
     
