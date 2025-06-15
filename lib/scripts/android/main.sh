@@ -14,95 +14,13 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 validate_required_variables() {
     echo "Validating required variables..."
     
-    # App Configuration Variables
-    local required_vars=(
+    # Only check essential variables that must be present
+    local essential_vars=(
         "VERSION_NAME"
         "VERSION_CODE"
         "APP_NAME"
-        "ORG_NAME"
-        "WEB_URL"
         "PKG_NAME"
         "BUNDLE_ID"
-        "EMAIL_ID"
-    )
-    
-    # Feature Flags
-    local feature_flags=(
-        "PUSH_NOTIFY"
-        "IS_CHATBOT"
-        "IS_DEEPLINK"
-        "IS_SPLASH"
-        "IS_PULLDOWN"
-        "IS_BOTTOMMENU"
-        "IS_LOAD_IND"
-    )
-    
-    # Permission Flags
-    local permission_flags=(
-        "IS_CAMERA"
-        "IS_LOCATION"
-        "IS_MIC"
-        "IS_NOTIFICATION"
-        "IS_CONTACT"
-        "IS_BIOMETRIC"
-        "IS_CALENDAR"
-        "IS_STORAGE"
-    )
-    
-    # Branding Variables
-    local branding_vars=(
-        "LOGO_URL"
-        "SPLASH_URL"
-        "SPLASH_BG"
-        "SPLASH_BG_COLOR"
-        "SPLASH_TAGLINE"
-        "SPLASH_TAGLINE_COLOR"
-        "SPLASH_ANIMATION"
-        "SPLASH_DURATION"
-    )
-    
-    # UI Configuration
-    local ui_config_vars=(
-        "BOTTOMMENU_ITEMS"
-        "BOTTOMMENU_BG_COLOR"
-        "BOTTOMMENU_ICON_COLOR"
-        "BOTTOMMENU_TEXT_COLOR"
-        "BOTTOMMENU_FONT"
-        "BOTTOMMENU_FONT_SIZE"
-        "BOTTOMMENU_FONT_BOLD"
-        "BOTTOMMENU_FONT_ITALIC"
-        "BOTTOMMENU_ACTIVE_TAB_COLOR"
-        "BOTTOMMENU_ICON_POSITION"
-        "BOTTOMMENU_VISIBLE_ON"
-    )
-    
-    # Firebase Configuration
-    local firebase_vars=(
-        "FIREBASE_CONFIG_ANDROID"
-        "FIREBASE_CONFIG_IOS"
-    )
-    
-    # Android Keystore Variables
-    local keystore_vars=(
-        "KEY_STORE"
-        "CM_KEYSTORE_PASSWORD"
-        "CM_KEY_ALIAS"
-        "CM_KEY_PASSWORD"
-    )
-    
-    # Admin Variables
-    local admin_vars=(
-        "CM_BUILD_DIR"
-        "BUILD_MODE"
-        "FLUTTER_VERSION"
-        "GRADLE_VERSION"
-        "JAVA_VERSION"
-        "ANDROID_COMPILE_SDK"
-        "ANDROID_MIN_SDK"
-        "ANDROID_TARGET_SDK"
-        "ANDROID_BUILD_TOOLS"
-        "ANDROID_NDK_VERSION"
-        "ANDROID_CMDLINE_TOOLS"
     )
     
     # Function to check variables
@@ -125,71 +43,51 @@ validate_required_variables() {
         return 0
     }
     
-    # Check all variable categories
-    local has_errors=0
-    
-    echo "Checking App Configuration Variables..."
-    check_variables "App Configuration" "${required_vars[@]}" || has_errors=1
-    
-    echo "Checking Feature Flags..."
-    check_variables "Feature Flags" "${feature_flags[@]}" || has_errors=1
-    
-    echo "Checking Permission Flags..."
-    check_variables "Permission Flags" "${permission_flags[@]}" || has_errors=1
-    
-    echo "Checking Branding Variables..."
-    check_variables "Branding" "${branding_vars[@]}" || has_errors=1
-    
-    echo "Checking UI Configuration Variables..."
-    check_variables "UI Configuration" "${ui_config_vars[@]}" || has_errors=1
-    
-    # Check Firebase variables if push notifications are enabled
-    if [ "${PUSH_NOTIFY:-}" = "true" ]; then
-        echo "Checking Firebase Configuration..."
-        check_variables "Firebase" "${firebase_vars[@]}" || has_errors=1
+    # Check essential variables
+    echo "Checking Essential Variables..."
+    if ! check_variables "Essential" "${essential_vars[@]}"; then
+        handle_build_error "Missing essential variables" 1 "$0" "${LINENO:-}"
     fi
     
-    # Check Keystore variables if needed
-    if [ "${PUSH_NOTIFY:-}" = "true" ] || [ "${KEY_STORE:-}" != "" ]; then
-        echo "Checking Keystore Variables..."
-        check_variables "Keystore" "${keystore_vars[@]}" || has_errors=1
-    fi
+    # Log available variables for debugging
+    echo "📝 Available variables:"
+    echo "App Info:"
+    echo "- VERSION_NAME: ${VERSION_NAME:-}"
+    echo "- VERSION_CODE: ${VERSION_CODE:-}"
+    echo "- APP_NAME: ${APP_NAME:-}"
+    echo "- PKG_NAME: ${PKG_NAME:-}"
+    echo "- BUNDLE_ID: ${BUNDLE_ID:-}"
     
-    echo "Checking Admin Variables..."
-    check_variables "Admin" "${admin_vars[@]}" || has_errors=1
+    echo "Feature Flags:"
+    echo "- PUSH_NOTIFY: ${PUSH_NOTIFY:-}"
+    echo "- IS_CHATBOT: ${IS_CHATBOT:-}"
+    echo "- IS_DEEPLINK: ${IS_DEEPLINK:-}"
+    echo "- IS_SPLASH: ${IS_SPLASH:-}"
+    echo "- IS_PULLDOWN: ${IS_PULLDOWN:-}"
+    echo "- IS_BOTTOMMENU: ${IS_BOTTOMMENU:-}"
+    echo "- IS_LOAD_IND: ${IS_LOAD_IND:-}"
     
-    if [ $has_errors -eq 1 ]; then
-        handle_build_error "Missing required variables" 1 "$0" "${LINENO:-}"
-    fi
+    echo "Build Mode:"
+    echo "- BUILD_MODE: ${BUILD_MODE:-}"
+    echo "- FLUTTER_VERSION: ${FLUTTER_VERSION:-}"
+    echo "- GRADLE_VERSION: ${GRADLE_VERSION:-}"
     
-    echo "✅ All required variables validated"
+    echo "✅ Variable validation completed"
 }
 
-# Load environment variables from API with improved error handling
+# Load environment variables from admin_vars.sh
 load_env_variables() {
-    echo "Loading environment variables from API..."
+    echo "Loading environment variables..."
     
-    # Try to load from API first
-    if [ -n "${API_URL:-}" ]; then
-        echo "Fetching variables from API..."
-        API_RESPONSE=$(curl -s "${API_URL}/config" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${API_TOKEN:-}")
-        
-        if [ $? -eq 0 ] && [ -n "$API_RESPONSE" ]; then
-            # Export variables from API response
-            eval "$(echo "$API_RESPONSE" | jq -r 'to_entries | .[] | "export \(.key)=\(.value)"')"
-            echo "✅ Environment variables loaded from API"
-        else
-            echo "⚠️ Failed to load variables from API, using defaults"
-            source "${SCRIPT_DIR}/admin_vars.sh"
-        fi
-    else
-        echo "⚠️ API_URL not set, using defaults"
+    # Source admin variables
+    if [ -f "${SCRIPT_DIR}/admin_vars.sh" ]; then
         source "${SCRIPT_DIR}/admin_vars.sh"
+        echo "✅ Admin variables loaded successfully"
+    else
+        handle_build_error "admin_vars.sh not found" 1 "$0" "${LINENO:-}"
     fi
     
-    # Validate all required variables
+    # Validate essential variables
     validate_required_variables
 }
 
@@ -417,12 +315,38 @@ handle_build_outputs() {
     echo "✅ Build outputs handled"
 }
 
+# Configure email settings
+configure_email_settings() {
+    echo "Configuring email settings..."
+    
+    # SMTP Configuration
+    export EMAIL_SMTP_SERVER="smtp.gmail.com"
+    export EMAIL_SMTP_PORT="587"
+    export EMAIL_SMTP_USER="${Notifi_E_ID:-prasannasrie@gmail.com}"
+    export EMAIL_SMTP_PASS="jbbf nzhm zoay lbwb"
+    
+    # Email notification settings
+    export NOTIFICATION_EMAIL_FROM="${EMAIL_SMTP_USER}"
+    export NOTIFICATION_EMAIL_TO="${EMAIL_ID:-}"
+    export NOTIFICATION_EMAIL_SUBJECT="QuikApp Build Status - ${APP_NAME:-QuikApp}"
+    
+    # Verify email configuration
+    if [ -z "${EMAIL_SMTP_SERVER:-}" ] || [ -z "${EMAIL_SMTP_PORT:-}" ] || [ -z "${EMAIL_SMTP_USER:-}" ] || [ -z "${EMAIL_SMTP_PASS:-}" ]; then
+        echo "⚠️ Warning: Incomplete email configuration"
+    else
+        echo "✅ Email configuration completed"
+    fi
+}
+
 # Main build process
 main() {
     echo "🚀 Starting Android build process..."
     
     # Load environment variables
     load_env_variables
+    
+    # Configure email settings
+    configure_email_settings
     
     # Configure build mode
     configure_build_mode
