@@ -58,7 +58,7 @@ pluginManagement {
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "8.3.0" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+    id("org.jetbrains.kotlin.android") version "1.9.23" apply false
 EOF
 
 if [ "${PUSH_NOTIFY}" = "true" ]; then
@@ -202,7 +202,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.22") # Added this line
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.23")
 EOF
 
 if [ "${PUSH_NOTIFY}" = "true" ]; then
